@@ -4,22 +4,24 @@
       <v-col cols="12" md="6" class="d-flex">
         <v-text-field
           v-model="search"
-          append-icon="mdi-magnify"
-          label="Search Pokémon by ID or Name"
+          label="Buscar Pokemon por ID ou nome"
           outlined
           dense
           class="mb-4"
           @keyup.enter="handleSearch"
         ></v-text-field>
         <v-btn color="primary" class="ml-2 mb-4" @click="handleSearch">
-          Search
+          Buscar
         </v-btn>
       </v-col>
     </v-row>
-    <v-row v-if="recentPokemons.length > 0">
+    <v-row v-if="recentPokemons.length > 0 && !search" class="mb-10">
+      <v-col cols="12">
+        <h2>Pokemons recentes</h2>
+      </v-col>
       <v-col cols="12" class="d-flex justify-end">
-        <v-btn color="red" @click="clearRecent">
-          Clear Recent
+        <v-btn color="red" @click="clearRecent" icon>
+          <v-icon>mdi-delete</v-icon>
         </v-btn>
       </v-col>
       <v-col
@@ -51,12 +53,15 @@
                 {{ type.type.name }}
               </v-chip>
             </div>
-            <p class="pokemon-id-background">{{ formatId(pokemon.id) }}</p>
+            <p :class="['pokemon-id-background', typeColorClass(pokemon.types[0]?.type?.name)]">{{ formatId(pokemon.id) }}</p>
           </v-card-text>
         </v-card>
       </v-col>
     </v-row>
     <v-row>
+      <v-col cols="12">
+        <h2>Pokémons</h2>
+      </v-col>
       <v-col
         v-for="pokemon in filteredPokemons"
         :key="pokemon.id"
@@ -96,7 +101,7 @@
                   {{ type.type.name }}
                 </v-chip>
               </div>
-              <p class="pokemon-id-background">{{ formatId(pokemon.id) }}</p>
+              <p :class="['pokemon-id-background', typeColorClass(pokemon.types[0]?.type?.name)]">{{ formatId(pokemon.id) }}</p>
             </v-card-text>
           </v-card>
         </v-hover>
@@ -104,7 +109,7 @@
     </v-row>
     <v-row>
       <v-col cols="12" class="text-center">
-        <v-btn v-if="visiblePokemons.length < pokemons.length" @click="loadMore" color="primary">
+        <v-btn v-if="visiblePokemons.length < pokemons.length && !search" @click="loadMore" color="primary">
           Ver Mais
         </v-btn>
       </v-col>
@@ -116,7 +121,7 @@
 </template>
 
 <script lang="ts">
-import { defineComponent } from 'vue';
+import { defineComponent, watch } from 'vue';
 import axios from 'axios';
 
 export default defineComponent({
@@ -128,18 +133,14 @@ export default defineComponent({
       search: '',
       visibleCount: 10,
       snackbar: false,
-      snackbarMessage: ''
+      snackbarMessage: '',
+      searchResults: [] as any[]
     };
   },
   computed: {
     filteredPokemons() {
-      if (this.search) {
-        const searchLower = this.search.toLowerCase();
-        return this.visiblePokemons.filter(
-          (pokemon) =>
-            pokemon.name.toLowerCase().includes(searchLower) ||
-            pokemon.id.toString() === searchLower
-        );
+      if (this.searchResults.length) {
+        return this.searchResults;
       }
       return this.visiblePokemons;
     },
@@ -171,29 +172,48 @@ export default defineComponent({
     },
     async handleSearch() {
       if (!this.search) {
-        this.snackbarMessage = 'Please enter a Pokémon ID or Name.';
-        this.snackbar = true;
+        this.resetSearchResults();
         return;
       }
-      
+
       const searchLower = this.search.toLowerCase();
       let apiUrl = 'https://pokeapi.co/api/v2/pokemon/';
+      this.searchResults = [];
       
       if (!isNaN(Number(searchLower))) {
         // Search by ID
         apiUrl += `${Number(searchLower)}`;
+        try {
+          const response = await axios.get(apiUrl);
+          this.searchResults.push({
+            id: response.data.id,
+            name: response.data.name,
+            image: response.data.sprites.front_default,
+            types: response.data.types,
+            loading: false
+          });
+        } catch (error) {
+          this.snackbarMessage = 'No Pokémon found.';
+          this.snackbar = true;
+          this.resetSearchResults();
+        }
       } else {
         // Search by Name
         apiUrl += `${searchLower}`;
-      }
-      
-      try {
-        const response = await axios.get(apiUrl);
-        this.addRecentPokemon(response.data);
-        this.$router.push(`/pokemon/${response.data.id}`);
-      } catch (error) {
-        this.snackbarMessage = 'No Pokémon found.';
-        this.snackbar = true;
+        try {
+          const response = await axios.get(apiUrl);
+          this.searchResults.push({
+            id: response.data.id,
+            name: response.data.name,
+            image: response.data.sprites.front_default,
+            types: response.data.types,
+            loading: false
+          });
+        } catch (error) {
+          this.snackbarMessage = 'No Pokémon found.';
+          this.snackbar = true;
+          this.resetSearchResults();
+        }
       }
     },
     addRecentPokemon(pokemon) {
@@ -240,8 +260,42 @@ export default defineComponent({
       };
       return colors[type] || '#A8A878';
     },
+    typeColorClass(type) {
+      const colorClasses = {
+        grass: 'type-grass',
+        fire: 'type-fire',
+        water: 'type-water',
+        bug: 'type-bug',
+        normal: 'type-normal',
+        poison: 'type-poison',
+        electric: 'type-electric',
+        ground: 'type-ground',
+        fairy: 'type-fairy',
+        fighting: 'type-fighting',
+        psychic: 'type-psychic',
+        rock: 'type-rock',
+        ghost: 'type-ghost',
+        ice: 'type-ice',
+        dragon: 'type-dragon',
+        dark: 'type-dark',
+        steel: 'type-steel',
+        flying: 'type-flying',
+      };
+      return colorClasses[type] || 'type-normal';
+    },
     formatId(id) {
       return id.toString().padStart(3, '0');
+    },
+    resetSearchResults() {
+      this.searchResults = [];
+      this.visiblePokemons = this.pokemons.slice(0, this.visibleCount);
+    }
+  },
+  watch: {
+    search(newSearch) {
+      if (!newSearch) {
+        this.resetSearchResults();
+      }
     }
   }
 });
@@ -249,11 +303,14 @@ export default defineComponent({
 
 <style scoped>
 .pokemon-card {
-  width: 300px;
+  width: 400px;
   height: 200px;
   display: flex;
   flex-direction: row;
   position: relative;
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  
 }
 
 .pokemon-image {
@@ -273,18 +330,80 @@ export default defineComponent({
 
 .pokemon-name {
   margin-bottom: 8px;
+  font-size: 12pt;
+  font-weight: bold;
+
 }
 
 .pokemon-types {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  align-items: center;
 }
 
 .pokemon-id-background {
   position: absolute;
-  bottom: 0;
+  bottom: -30px;
   right: 0;
   font-size: 70pt;
-  opacity: 0.1;
+  opacity: 0.2;
+  color: #000;
+}
+
+
+.type-grass {
+  color: #78C850;
+}
+.type-fire {
+  color: #F08030;
+}
+.type-water {
+  color: #6890F0;
+}
+.type-bug {
+  color: #A8B820;
+}
+.type-normal {
+  color: #A8A878;
+}
+.type-poison {
+  color: #A040A0;
+}
+.type-electric {
+  color: #F8D030;
+}
+.type-ground {
+  color: #E0C068;
+}
+.type-fairy {
+  color: #EE99AC;
+}
+.type-fighting {
+  color: #C03028;
+}
+.type-psychic {
+  color: #F85888;
+}
+.type-rock {
+  color: #B8A038;
+}
+.type-ghost {
+  color: #705898;
+}
+.type-ice {
+  color: #98D8D8;
+}
+.type-dragon {
+  color: #7038F8;
+}
+.type-dark {
+  color: #705848;
+}
+.type-steel {
+  color: #B8B8D0;
+}
+.type-flying {
+  color: #A890F0;
 }
 </style>
