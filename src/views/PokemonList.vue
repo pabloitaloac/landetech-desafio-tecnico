@@ -15,9 +15,9 @@
         </v-btn>
       </v-col>
     </v-row>
-    <v-row v-if="recentPokemons.length > 0 && !search" class="mb-10">
+    <v-row v-if="recentPokemons.length > 0" class="mb-10">
       <v-col cols="12">
-        <h2>Pokemons recentes</h2>
+        <h2>Pokémons Recentes</h2>
       </v-col>
       <v-col cols="12" class="d-flex justify-end">
         <v-btn color="red" @click="clearRecent" icon>
@@ -32,7 +32,7 @@
       >
         <v-card 
           class="pokemon-card"
-          :href="`/pokemon/${pokemon.id}`"
+          @click="viewPokemon(pokemon)"
           style="text-decoration: none; color: inherit;"
         >
           <v-img
@@ -72,7 +72,7 @@
           <v-card 
             class="pokemon-card"
             v-bind="props"
-            :href="`/pokemon/${pokemon.id}`"
+            @click="viewPokemon(pokemon)"
             style="text-decoration: none; color: inherit;"
           >
             <v-img
@@ -221,7 +221,7 @@ export default defineComponent({
       recent.unshift({
         id: pokemon.id,
         name: pokemon.name,
-        image: pokemon.sprites.front_default,
+        image: pokemon.image,
         types: pokemon.types
       });
       this.recentPokemons = recent.slice(0, 3);
@@ -289,6 +289,10 @@ export default defineComponent({
     resetSearchResults() {
       this.searchResults = [];
       this.visiblePokemons = this.pokemons.slice(0, this.visibleCount);
+    },
+    viewPokemon(pokemon) {
+      this.addRecentPokemon(pokemon);
+      this.$router.push(`/pokemon/${pokemon.id}`);
     }
   },
   watch: {
@@ -310,7 +314,7 @@ export default defineComponent({
   position: relative;
   background-color: rgba(255, 255, 255, 0.12);
   border-radius: 10px;
-  
+  cursor: pointer;
 }
 
 .pokemon-image {
@@ -332,7 +336,6 @@ export default defineComponent({
   margin-bottom: 8px;
   font-size: 12pt;
   font-weight: bold;
-
 }
 
 .pokemon-types {
@@ -350,7 +353,6 @@ export default defineComponent({
   opacity: 0.2;
   color: #000;
 }
-
 
 .type-grass {
   color: #78C850;
